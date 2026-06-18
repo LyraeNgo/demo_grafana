@@ -1,0 +1,25 @@
+services:
+  nginx:
+    image: nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: always
+    ports:
+      - "8080:80"
+    networks:
+      - abc
+    depends_on:
+      - backend
+    
+  backend:
+    image: be
+    restart: always
+    env_file:
+      - .env
+    networks:
+      - abc
+
+networks:
+  abc:
+    driver: bridge
+    
