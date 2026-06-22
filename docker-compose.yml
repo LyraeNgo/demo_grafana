@@ -6,15 +6,33 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
     restart: always
     ports:
-      - "8080:80"
+      - "80:80"
       - "443:443"
     networks:
       - abc
     depends_on:
       - backend
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb_prod
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123 # Đổi mật khẩu của bạn
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - abc
     
   backend:
+    build: .
     image: be
+    environment:
+      
+      - OTEL_SERVICE_NAME=my_python_api
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
     restart: always
     env_file:
       - .env
@@ -31,22 +49,29 @@ services:
 
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - abc
 
   node-exporter:
     image: prom/node-exporter
     container_name: node-exporter
     ports:
       - "9100:9100"
+    networks:
+      - abc
 
   grafana:
     image: grafana/grafana
     ports:
       - "3000:3000"
-  
+    networks:
+      - abc
+
   loki:
     image: grafana/loki:latest
     container_name: loki
-
+    networks:
+      - abc
     ports:
       - "3100:3100"
 
@@ -54,20 +79,62 @@ services:
 
   promtail:
     image: grafana/promtail:latest
-
+    user: "root"
     container_name: promtail
 
     volumes:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - ./promtail-config.yml:/etc/promtail/config.yml
-
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     command:
       - -config.file=/etc/promtail/config.yml
 
     depends_on:
       - loki
+    networks:
+      - abc
+    
+  tempo:
+    image: grafana/tempo:2.4.1
+    container_name: tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+       - ./tempo.yaml:/etc/tempo.yaml:ro
+    ports:
+     - "4317:4317"
+     - "4318:4318"
+     - "3200:3200"    
+    networks:
+      - abc
 
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    command:
+      - --allow_dynamic_housekeeping=true
+      - --housekeeping_interval=10s
+    privileged: true
+    user: root
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    environment:
+      - CADVISOR_HEALTHCHECK_URL=http://localhost:8080/healthz
+    networks:
+      - abc
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
 networks:
   abc:
     driver: bridge
     
+volumes:
+  mongo_data:
