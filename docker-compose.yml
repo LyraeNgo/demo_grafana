@@ -18,28 +18,42 @@ services:
     restart: always
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin123 # Đổi mật khẩu của bạn
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_DATABASE: chaters_db
     volumes:
       - mongo_data:/data/db
     networks:
       - abc
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     
   backend:
     build: .
     image: be
     environment:
-      
       - OTEL_SERVICE_NAME=my_python_api
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
       - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - MONGO_URL=mongodb://admin:admin123@mongodb:27017/chaters_db?authSource=admin
+      - MONGO_DB_NAME=chaters_db
+
     restart: always
     env_file:
       - .env
+    depends_on:
+      mongodb:
+        condition: service_healthy
     networks:
       - abc
     ports:
       - "4000:${PORT}"
+
   prometheus:
     image: prom/prometheus
     container_name: prometheus
@@ -107,31 +121,6 @@ services:
     networks:
       - abc
 
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.49.1
-    container_name: cadvisor
-    command:
-      - --allow_dynamic_housekeeping=true
-      - --housekeeping_interval=10s
-    privileged: true
-    user: root
-    devices:
-      - /dev/kmsg
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /sys/fs/cgroup:/sys/fs/cgroup:ro
-    environment:
-      - CADVISOR_HEALTHCHECK_URL=http://localhost:8080/healthz
-    networks:
-      - abc
-    ports:
-      - "8080:8080"
-    restart: unless-stopped
 networks:
   abc:
     driver: bridge

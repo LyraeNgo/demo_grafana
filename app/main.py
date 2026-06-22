@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from typing import Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -48,9 +49,10 @@ def get_trace_id():
 # 3. KẾT NỐI DATABASE MONGODB
 # =====================================================================
 # Đọc biến môi trường từ Compose, nếu không có sẽ dùng mặc định
-MONGO_URL = "mongodb://admin:admin123@mongodb:27017/?authSource=admin"
+MONGO_URL = os.getenv("MONGO_URL", "mongodb://admin:admin123@mongodb:27017/chaters_db?authSource=admin")
+MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "chaters_db")
 client = AsyncIOMotorClient(MONGO_URL)
-db = client.chaters_db
+db = client[MONGO_DB_NAME]
 items_collection = db.get_collection("items")
 counters_collection = db.get_collection("counters")
 
@@ -72,6 +74,15 @@ async def get_next_sequence_value(sequence_name: str) -> int:
 # Khởi tạo dữ liệu mẫu nếu Database trống khi chạy ứng dụng lần đầu
 @app.on_event("startup")
 async def startup_db_client():
+    for _ in range(10):
+        try:
+            await client.admin.command("ping")
+            break
+        except Exception:
+            await asyncio.sleep(2)
+    else:
+        raise RuntimeError("Không thể kết nối tới MongoDB")
+
     if await items_collection.count_documents({}) == 0:
         # Tạo counter ban đầu
         await counters_collection.update_one(
