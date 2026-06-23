@@ -31,6 +31,17 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+  
+  mongodb-exporter:
+    image: percona/mongodb_exporter:0.40.0
+    container_name: mongodb_exporter
+    restart: always
+    command:
+      - '--mongodb.uri=mongodb://admin:admin123@mongodb_prod:27017/?authSource=admin' # Thay bằng URI kết nối nội bộ trong Docker của bạn
+    ports:
+      - "9216:9216"
+    networks:
+      - abc
     
   backend:
     build: .
@@ -67,8 +78,15 @@ services:
       - abc
 
   node-exporter:
-    image: prom/node-exporter
+    image: prom/node-exporter:latest # Hoặc phiên bản bạn đang dùng
     container_name: node-exporter
+    restart: always
+    volumes:
+      # Lệnh này mount toàn bộ ổ cứng gốc (/) của server EC2 vào thư mục /hostfs bên trong container với quyền chỉ đọc (ro - read only)
+      - /:/hostfs:ro    
+    command:
+      # Báo cho node-exporter biết rằng /hostfs chính là ổ cứng vật lý cần đo lường
+      - '--path.rootfs=/hostfs' 
     ports:
       - "9100:9100"
     networks:

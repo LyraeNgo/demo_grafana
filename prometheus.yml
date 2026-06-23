@@ -14,15 +14,6 @@ scrape_configs:
     static_configs:
       - targets: ["backend:4000"]
 
-  - job_name: 'cadvisor'
-    static_configs:
-      - targets: ['cadvisor:8080']
-    metric_relabel_configs:
-      # Bẫy tất cả các ID có chứa chuỗi docker hoặc scope của container
-      - source_labels: [id]
-        regex: '.*/(?:docker-)?([a-f0-9]{12})[a-f0-9]*.*'
-        target_label: 'container_id'
-        replacement: '$1'
 
   - job_name: "loki"
     static_configs:
@@ -31,3 +22,8 @@ scrape_configs:
   - job_name: "tempo"
     static_configs:
       - targets: ["tempo:3200"] # Tempo mặc định có endpoint /metrics ở cổng 3200
+
+  - job_name: "mongodb"
+    scrape_interval: 15s # Gợi ý: Nên giãn thời gian scrape của DB ra một chút
+    static_configs:
+      - targets: ["mongodb-exporter:9216"]
