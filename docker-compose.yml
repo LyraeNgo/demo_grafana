@@ -12,6 +12,7 @@ services:
       - abc
     depends_on:
       - backend
+      - frontend
   mongodb:
     image: mongo:latest
     container_name: mongodb_prod
@@ -64,6 +65,13 @@ services:
       - abc
     ports:
       - "4000:${PORT}"
+
+  frontend:
+    build: ./Frontend
+    image: fe
+    restart: always
+    networks:
+      - abc
 
   prometheus:
     image: prom/prometheus

@@ -3,6 +3,7 @@ import logging
 import asyncio
 from typing import Optional
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from opentelemetry import trace
@@ -33,6 +34,23 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="CRUD API with LGTM Stack & MongoDB")
+
+frontend_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "FRONTEND_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,http://192.168.56.1:5173,https://chaters.shop,https://fe.chaters.shop"
+    ).split(",")
+    if origin.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=frontend_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # =====================================================================
 # 2. KÍCH HOẠT METRICS & TRACES CHO FASTAPI
