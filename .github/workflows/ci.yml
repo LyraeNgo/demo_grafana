@@ -2,28 +2,64 @@ name: FastAPI CI Pipeline
 
 on:
   push:
-    branches: [ "main" ] # Chạy khi push lên nhánh main
+    branches: [ "main" ] 
+  pull_request:
+    branches: ["main"] 
 
 jobs:
-  build-and-push:
+  build-and-test: 
     runs-on: ubuntu-latest
     steps:
-      # 1. Checkout source code
+
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Login vào Docker Hub
+      
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10' 
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt # Giả sử bạn có file requirements.txt
+          # Nếu dùng Poetry/Rye/PDM, lệnh sẽ khác: ví dụ `poetry install`
+
+      # 4. Run Code Linting (ví dụ với flake8)
+      - name: Run Ruff
+        run: |
+          pip install ruff
+          ruff check .
+
+      # 5. Run Automated Tests (ví dụ với pytest)
+      - name: Run Pytest
+        run: |
+          pip install pytest # Cài đặt pytest nếu chưa có
+          pytest # Chạy tất cả các bài kiểm thử
+
+      # 6. Run Security Audit for Dependencies (SCA - ví dụ với pip-audit)
+      - name: Run Dependency Security Audit
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt --strict # Quét lỗ hổng trong các dependency
+        continue-on-error: true # Đặt thành true nếu bạn muốn cảnh báo thay vì fail ngay lập tức, nhưng không khuyến khích cho CI
+
+      # 7. Login vào Docker Hub (chỉ khi mọi thứ trước đó thành công)
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 3. Build và Push Docker Image
-      - name: Build and push
+      # 8. Build và Push Docker Image (chỉ khi mọi thứ trước đó thành công)
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          # Tạo tag dựa trên mã commit để dễ quản lý
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/fastapi-app:${{ github.sha }}
+          # Thêm tag latest nếu bạn muốn:
+          # tags: |
+          #   ${{ secrets.DOCKERHUB_USERNAME }}/fastapi-app:latest
+          #   ${{ secrets.DOCKERHUB_USERNAME }}/fastapi-app:${{ github.sha }}
