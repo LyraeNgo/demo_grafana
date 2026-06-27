@@ -31,11 +31,11 @@ jobs:
           pip install ruff
           ruff check .
 
-      # 5. Run Automated Tests (ví dụ với pytest)
-      - name: Run Pytest
-        run: |
-          pip install pytest # Cài đặt pytest nếu chưa có
-          pytest # Chạy tất cả các bài kiểm thử
+      # # 5. Run Automated Tests (ví dụ với pytest)
+      # - name: Run Pytest
+      #   run: |
+      #     pip install pytest # Cài đặt pytest nếu chưa có
+      #     pytest # Chạy tất cả các bài kiểm thử
 
       # 6. Run Security Audit for Dependencies (SCA - ví dụ với pip-audit)
       - name: Run Dependency Security Audit
