@@ -11,18 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      security-events: write
+      security-events: write # Quyền này cho phép đẩy kết quả quét lên GitHub
       actions: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: python
+          fetch-depth: 0 # Required for Gitleaks to scan history
 
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
@@ -34,31 +29,39 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r app/requirements.txt
 
-      - name: Run Ruff & Linting
+      - name: Run Ruff
         run: |
-          pip install ruff yamllint
+          pip install ruff
           ruff check .
+      
+      - name: Validate Observability Configs
+        run: |
+          # Kiểm tra cấu hình Prometheus
+          docker run --rm \
+            --entrypoint=promtool \
+            -v $(pwd)/prometheus.yml:/prometheus.yml \
+            prom/prometheus:latest \
+            check config /prometheus.yml
+          
+          # Kiểm tra YAML cú pháp (cần cài yamllint)
+          pip install yamllint
           yamllint .
 
-      - name: Validate Observability
+      - name: Run Dependency Security Audit
         run: |
-          export $(grep -v '^#' .env | xargs)
-          docker run --rm --entrypoint=promtool -v $(pwd)/prometheus.yml:/prometheus.yml prom/prometheus:latest check config /prometheus.yml
-          docker compose -f docker-compose.yml config
-
-      - name: Run Security Audit
-        run: |
-          pip install pip-audit bandit
+          pip install pip-audit
+          # Corrected path to point to your requirements file
           pip-audit -r app/requirements.txt --strict
+
+      - name: Run Static Analysis (Bandit)
+        run: |
+          pip install bandit
           bandit -r . -ll -f json -o bandit-report.json
 
-      - name: Run Gitleaks
+      - name: Run Gitleaks Secret Scan
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITLEAKS_TOKEN }}
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
 
       - name: Login to Docker Hub 
         uses: docker/login-action@v3
@@ -66,26 +69,40 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/fastapi-app:${{ github.sha }}
+      # 1. Bổ sung CodeQL (LGTM)
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
 
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+      # 2. Kiểm tra tính hợp lệ của Docker Compose (tránh lỗi Runtime)
+      - name: Test Docker Compose Configuration
+        run: |
+          docker compose -f docker-compose.yml config
+
+      # 3. Job Deploy riêng biệt sau khi Build & Push thành công
+      # (Khuyên dùng: tách thành job deploy phụ thuộc vào job build)
   deploy:
     needs: build-and-test
-    runs-on: ubuntu-latest # Nếu bạn dùng ssh-action thì dùng runner này
+    runs-on: ubuntu-latest # Runner trên VM của bạn
     steps:
-      - name: Deploy to VM
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          script: |
-            # Lệnh này chạy trên VM của bạn
-            cd /path/to/your/project
-            docker compose pull
-            docker compose up -d
-            curl -X POST -H "Authorization: Bearer ${GRAFANA_API_KEY}" http://localhost:3000/api/admin/provisioning/dashboards/reload
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Reload Grafana & Alert Configs
+        run: |
+          # Đồng bộ thư mục cấu hình sang VM
+          rsync -av ./grafana/provisioning/ /opt/grafana/provisioning/
+          
+          # Gọi API để reload cấu hình mà không cần restart container
+          curl -X POST -H "Authorization: Bearer ${GRAFANA_API_KEY}" \
+               http://localhost:3000/api/admin/provisioning/dashboards/reload
