@@ -86,8 +86,10 @@ jobs:
 
       # 2. Kiểm tra tính hợp lệ của Docker Compose (tránh lỗi Runtime)
       - name: Test Docker Compose Configuration
+        env:
+          # Truyền biến từ GitHub Secrets vào đây
+          PORT: ${{ secrets.PORT }}
         run: |
-          export $(grep -v '^#' .env | xargs)
           docker compose -f docker-compose.yml config
 
       # 3. Job Deploy riêng biệt sau khi Build & Push thành công
