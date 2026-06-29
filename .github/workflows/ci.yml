@@ -10,11 +10,11 @@ jobs:
   build-and-test: 
     runs-on: ubuntu-latest
     steps:
-
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for Gitleaks to scan history
 
-      
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
@@ -25,40 +25,36 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r app/requirements.txt
 
-      # 4. Run Code Linting (ví dụ với flake8)
       - name: Run Ruff
         run: |
           pip install ruff
           ruff check .
 
-      # # 5. Run Automated Tests (ví dụ với pytest)
-      # - name: Run Pytest
-      #   run: |
-      #     pip install pytest # Cài đặt pytest nếu chưa có
-      #     pytest # Chạy tất cả các bài kiểm thử
-
-      # 6. Run Security Audit for Dependencies (SCA - ví dụ với pip-audit)
       - name: Run Dependency Security Audit
         run: |
           pip install pip-audit
-          pip-audit -r requirements.txt --strict # Quét lỗ hổng trong các dependency
-        continue-on-error: true # Đặt thành true nếu bạn muốn cảnh báo thay vì fail ngay lập tức, nhưng không khuyến khích cho CI
+          # Corrected path to point to your requirements file
+          pip-audit -r app/requirements.txt --strict
 
-      # 7. Login vào Docker Hub (chỉ khi mọi thứ trước đó thành công)
+      - name: Run Static Analysis (Bandit)
+        run: |
+          pip install bandit
+          bandit -r . -ll -f json -o bandit-report.json
+
+      - name: Run Gitleaks Secret Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITLEAKS_TOKEN }}
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 8. Build và Push Docker Image (chỉ khi mọi thứ trước đó thành công)
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/fastapi-app:${{ github.sha }}
-          # Thêm tag latest nếu bạn muốn:
-          # tags: |
-          #   ${{ secrets.DOCKERHUB_USERNAME }}/fastapi-app:latest
-          #   ${{ secrets.DOCKERHUB_USERNAME }}/fastapi-app:${{ github.sha }}
