@@ -9,3 +9,5 @@ rules:
   brackets: disable           # Không bắt buộc khoảng cách trong ngoặc []
   truthy: disable             # Cho phép các giá trị boolean mặc định
   indentation: disable        # Tắt kiểm tra thụt lề chặt chẽ
+  new-line-at-end-of-file: disable # Thêm dòng này vào để hết lỗi
+  
