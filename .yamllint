@@ -1,0 +1,11 @@
+# File: .yamllint
+extends: default
+
+rules:
+  line-length: disable        # Tắt giới hạn 80 ký tự
+  document-start: disable     # Không bắt buộc dấu ---
+  trailing-spaces: disable    # Cho phép thừa khoảng trắng cuối dòng
+  comments: disable           # Không bắt buộc khoảng cách trước comment
+  brackets: disable           # Không bắt buộc khoảng cách trong ngoặc []
+  truthy: disable             # Cho phép các giá trị boolean mặc định
+  indentation: disable        # Tắt kiểm tra thụt lề chặt chẽ
