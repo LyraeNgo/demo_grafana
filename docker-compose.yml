@@ -102,8 +102,16 @@ services:
 
   grafana:
     image: grafana/grafana
+    environment:
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
     ports:
       - "3000:3000"
+    volumes:
+      # Persist Grafana data across container recreation.
+      - grafana_data:/var/lib/grafana
+      # Load Grafana provisioning files and dashboards from source control.
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
     networks:
       - abc
 
@@ -153,3 +161,4 @@ networks:
     
 volumes:
   mongo_data:
+  grafana_data:
