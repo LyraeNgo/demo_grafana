@@ -11,8 +11,12 @@ services:
     networks:
       - abc
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_started
+      grafana:
+        condition: service_healthy
   mongodb:
     image: mongo:latest
     container_name: mongodb_prod
@@ -104,6 +108,9 @@ services:
     image: grafana/grafana
     environment:
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - GF_SERVER_DOMAIN=grafana.chaters.shop
+      - GF_SERVER_ROOT_URL=https://grafana.chaters.shop/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=false
     ports:
       - "3000:3000"
     volumes:
@@ -112,6 +119,11 @@ services:
       # Load Grafana provisioning files and dashboards from source control.
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/etc/grafana/dashboards:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
     networks:
       - abc
 
