@@ -60,8 +60,6 @@ services:
       - MONGO_DB_NAME=chaters_db
 
     restart: always
-    env_file:
-      - .env
     depends_on:
       mongodb:
         condition: service_healthy
