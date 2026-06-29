@@ -106,8 +106,10 @@ services:
 
   grafana:
     image: grafana/grafana
+    env_file:
+      - path: ./grafana/grafana.env
+        required: false
     environment:
-      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
       - GF_SERVER_DOMAIN=grafana.chaters.shop
       - GF_SERVER_ROOT_URL=https://grafana.chaters.shop/
       - GF_SERVER_SERVE_FROM_SUB_PATH=false

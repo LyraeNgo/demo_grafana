@@ -33,7 +33,11 @@ jobs:
       - name: Validate Observability Configs
         run: |
           # Kiểm tra cấu hình Prometheus
-          docker run --rm -v $(pwd)/prometheus.yml:/prometheus.yml prom/prometheus:latest promtool check config /prometheus.yml
+          docker run --rm \
+            --entrypoint=promtool \
+            -v $(pwd)/prometheus.yml:/prometheus.yml \
+            prom/prometheus:latest \
+            check config /prometheus.yml
           
           # Kiểm tra YAML cú pháp (cần cài yamllint)
           pip install yamllint

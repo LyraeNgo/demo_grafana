@@ -5,6 +5,7 @@ venv/
 .venv/
 
 .env
+grafana/grafana.env
 
 .pytest_cache/
 .mypy_cache/
