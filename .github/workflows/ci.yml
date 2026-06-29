@@ -42,6 +42,7 @@ jobs:
 
       - name: Validate Observability
         run: |
+          export $(grep -v '^#' .env | xargs)
           docker run --rm --entrypoint=promtool -v $(pwd)/prometheus.yml:/prometheus.yml prom/prometheus:latest check config /prometheus.yml
           docker compose -f docker-compose.yml config
 
