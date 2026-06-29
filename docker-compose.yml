@@ -68,7 +68,7 @@ services:
     networks:
       - abc
     ports:
-      - "4000:${PORT}"
+      - "4000:4000"
 
   frontend:
     build: ./Frontend
