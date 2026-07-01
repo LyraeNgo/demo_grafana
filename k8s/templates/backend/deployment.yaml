@@ -1,0 +1,94 @@
+# Deployment cho Backend (FastAPI/Python)
+# Dùng Deployment vì backend là stateless (không lưu data trên disk)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "chaters.labels" . | nindent 4 }}
+    {{- include "chaters.backend.selectorLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector:
+    matchLabels:
+      {{- include "chaters.backend.selectorLabels" . | nindent 6 }}
+  # RollingUpdate: zero-downtime deploy (update từng pod một)
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0    # Không bao giờ để 0 pod chạy
+      maxSurge: 1          # Tạo thêm 1 pod mới trước khi xóa pod cũ
+  template:
+    metadata:
+      labels:
+        {{- include "chaters.backend.selectorLabels" . | nindent 8 }}
+    spec:
+      # Chờ MongoDB healthy trước khi backend start
+      # initContainers chờ mongodb Service sẵn sàng
+      initContainers:
+        - name: wait-for-mongodb
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for MongoDB to be ready..."
+              until nc -z mongodb {{ .Values.mongodb.port }}; do
+                echo "MongoDB not ready yet, sleeping 3s..."
+                sleep 3
+              done
+              echo "MongoDB is ready!"
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.backend.port }}
+              name: http
+          # Biến môi trường nhạy cảm: load từ Secret
+          env:
+            - name: MONGO_URL
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: MONGO_URL
+            - name: MONGO_DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: MONGO_DB_NAME
+            - name: DISCORD_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: DISCORD_WEBHOOK_URL
+            # Biến OTEL không nhạy cảm: để thẳng trong manifest
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.backend.otel.serviceName | quote }}
+            - name: OTEL_TRACES_EXPORTER
+              value: {{ .Values.backend.otel.tracesExporter | quote }}
+            - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+              value: {{ .Values.backend.otel.exporterEndpoint | quote }}
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: {{ .Values.backend.otel.exporterProtocol | quote }}
+          # Readiness Probe: pod chỉ nhận traffic khi app đã sẵn sàng
+          readinessProbe:
+            httpGet:
+              path: /      # FastAPI thường trả về 200 ở root
+              port: {{ .Values.backend.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Liveness Probe: restart pod nếu app bị treo
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.backend.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}

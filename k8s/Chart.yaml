@@ -1,0 +1,16 @@
+apiVersion: v2
+name: chaters-app
+description: |
+  Helm chart for Chaters application.
+  Includes: Backend (FastAPI), MongoDB (StatefulSet), Nginx (Reverse Proxy).
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - chaters
+  - fastapi
+  - mongodb
+  - nginx
+maintainers:
+  - name: Your Name
+    email: your.email@example.com

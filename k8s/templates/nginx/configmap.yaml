@@ -1,0 +1,69 @@
+# ConfigMap chứa nginx.conf
+# Trong K8s, nginx đóng vai trò reverse proxy (không cần SSL - học tập)
+# SSL có thể thêm sau qua cert-manager + Ingress
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "chaters.labels" . | nindent 4 }}
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+        sendfile        on;
+        keepalive_timeout  65;
+
+        # Log format đẹp hơn mặc định
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" rt=$request_time';
+        access_log /var/log/nginx/access.log main;
+        error_log  /var/log/nginx/error.log warn;
+
+        server {
+            listen 80;
+            server_name _;
+
+            # Health check endpoint cho Kubernetes Probe
+            # Nginx tự trả về 200 mà không cần call backend
+            location /health {
+                access_log off;
+                return 200 '{"status":"ok","service":"nginx"}';
+                add_header Content-Type application/json;
+            }
+
+            # Nginx stub_status - cho Prometheus scrape metrics
+            location /nginx-metrics {
+                stub_status on;
+                allow all;
+            }
+
+            # Proxy tất cả request về Backend (FastAPI)
+            # 'backend' là tên Service trong cùng namespace
+            # K8s DNS sẽ resolve: backend -> ClusterIP của backend Service
+            location / {
+                proxy_pass http://backend:4000;
+                proxy_http_version 1.1;
+
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+
+                # Quan trọng cho WebSocket (nếu có)
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+
+                proxy_connect_timeout 60s;
+                proxy_send_timeout    60s;
+                proxy_read_timeout    60s;
+            }
+        }
+    }

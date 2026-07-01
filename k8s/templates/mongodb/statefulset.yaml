@@ -1,0 +1,92 @@
+# StatefulSet cho MongoDB
+# Dùng StatefulSet thay vì Deployment vì:
+# 1. Có stable network identity (pod name cố định: mongodb-0)
+# 2. Hỗ trợ volumeClaimTemplates để tạo PVC tự động
+# 3. Pod được tạo/xóa theo thứ tự (quan trọng cho replica set sau này)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "chaters.labels" . | nindent 4 }}
+    {{- include "chaters.mongodb.selectorLabels" . | nindent 4 }}
+spec:
+  serviceName: mongodb    # Phải khớp với tên Service ở trên
+  replicas: {{ .Values.mongodb.replicas }}
+  selector:
+    matchLabels:
+      {{- include "chaters.mongodb.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "chaters.mongodb.selectorLabels" . | nindent 8 }}
+    spec:
+      # Đảm bảo pod được terminate gracefully
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: mongodb
+          image: "{{ .Values.mongodb.image.repository }}:{{ .Values.mongodb.image.tag }}"
+          imagePullPolicy: {{ .Values.mongodb.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.mongodb.port }}
+              name: mongodb
+          # Load credentials từ Secret (không hardcode trong manifest)
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: root-username
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: root-password
+            - name: MONGO_INITDB_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: database
+          volumeMounts:
+            - name: mongo-data
+              mountPath: /data/db    # Thư mục mặc định MongoDB lưu data
+          # Readiness: pod chỉ nhận traffic khi MongoDB đã sẵn sàng
+          readinessProbe:
+            exec:
+              command:
+                - mongosh
+                - --quiet
+                - --eval
+                - "db.runCommand({ ping: 1 })"
+            initialDelaySeconds: 10   # Chờ 10s sau khi container start
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          # Liveness: restart container nếu MongoDB bị treo
+          livenessProbe:
+            exec:
+              command:
+                - mongosh
+                - --quiet
+                - --eval
+                - "db.runCommand({ ping: 1 })"
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.mongodb.resources | nindent 12 }}
+  # volumeClaimTemplates: Tự động tạo PVC cho mỗi pod
+  # Khi pod mongodb-0 được tạo, K8s tự tạo PVC "mongo-data-mongodb-0"
+  volumeClaimTemplates:
+    - metadata:
+        name: mongo-data
+      spec:
+        accessModes: ["ReadWriteOnce"]    # Chỉ 1 node được mount (phù hợp single instance)
+        {{- if .Values.mongodb.storage.storageClass }}
+        storageClassName: {{ .Values.mongodb.storage.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.mongodb.storage.size }}

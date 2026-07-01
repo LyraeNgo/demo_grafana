@@ -1,0 +1,72 @@
+# ArgoCD Application - định nghĩa cách ArgoCD sync Helm chart từ Git
+# Apply file này vào namespace 'argocd' trên cluster:
+#   kubectl apply -f k8s/argocd/application.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: chaters-app
+  namespace: argocd       # ArgoCD luôn chạy trong namespace 'argocd'
+  labels:
+    app.kubernetes.io/name: chaters-app
+  # Khi Application bị xóa, tự động xóa luôn tất cả resources đã tạo
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+
+spec:
+  project: default
+
+  # -------------------------------------------------------
+  # Source: Git repo chứa Helm chart
+  # -------------------------------------------------------
+  source:
+    # TODO: Thay bằng URL Git repo thực của bạn
+    repoURL: https://github.com/LyraeNgo/demo_grafana.git
+    # Branch/tag ArgoCD sẽ watch. Dùng 'main' hoặc 'HEAD'
+    targetRevision: HEAD
+    # Đường dẫn đến Helm chart trong repo
+    path: k8s
+
+    helm:
+      # Override values - các giá trị ở đây ghi đè values.yaml
+      # Hữu ích để set image tag khác nhau cho dev/prod
+      values: |
+        backend:
+          image:
+            # TODO: Thay YOUR_DOCKERHUB_USERNAME bằng username thực
+            repository: minhtam2611/chaters-backend
+            tag: latest
+        mongodb:
+          credentials:
+            # TODO: Đổi password trong production!
+            rootPassword: admin123
+        nginx:
+          service:
+            type: NodePort
+            nodePort: 30080
+
+  # -------------------------------------------------------
+  # Destination: Deploy vào cluster nào, namespace nào
+  # -------------------------------------------------------
+  destination:
+    # https://kubernetes.default.svc = cluster mà ArgoCD đang chạy trên đó
+    server: https://kubernetes.default.svc
+    namespace: chaters
+
+  # -------------------------------------------------------
+  # Sync Policy: Cách ArgoCD tự động đồng bộ
+  # -------------------------------------------------------
+  syncPolicy:
+    automated:
+      prune: true       # Xóa resources không còn trong Git
+      selfHeal: true    # Tự sync lại nếu ai đó sửa trực tiếp trên cluster
+    syncOptions:
+      - CreateNamespace=true          # Tự tạo namespace 'chaters' nếu chưa có
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true                # Xóa resources cũ sau khi resources mới healthy
+      - ServerSideApply=true          # Dùng server-side apply (tránh conflict)
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

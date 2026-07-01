@@ -1,0 +1,8 @@
+# Namespace riêng cho toàn bộ ứng dụng
+# ArgoCD sẽ tự tạo namespace này nếu được cấu hình CreateNamespace=true
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace }}
+  labels:
+    {{- include "chaters.labels" . | nindent 4 }}

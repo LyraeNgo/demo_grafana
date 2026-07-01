@@ -1,0 +1,75 @@
+# ============================================================
+# Global Configuration
+# ============================================================
+namespace: chaters
+
+# ============================================================
+# Backend (FastAPI / Python)
+# ============================================================
+backend:
+  image:
+    # TODO: Thay YOUR_DOCKERHUB_USERNAME bằng username Docker Hub thực của bạn
+    repository: minhtam2611/chaters-backend
+    tag: latest
+    pullPolicy: Always
+  replicas: 1
+  port: 4000
+  otel:
+    serviceName: my_python_api
+    tracesExporter: otlp
+    # Nếu chưa có tempo, có thể để trống hoặc comment out
+    exporterEndpoint: "http://tempo:4318/v1/traces"
+    exporterProtocol: "http/protobuf"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# ============================================================
+# MongoDB
+# ============================================================
+mongodb:
+  image:
+    repository: mongo
+    tag: "7.0"          # Dùng version cụ thể thay vì 'latest' để tránh breaking changes
+    pullPolicy: IfNotPresent
+  replicas: 1
+  port: 27017
+  credentials:
+    rootUsername: admin
+    rootPassword: admin123   # ⚠️ Đổi password trong production!
+    database: chaters_db
+  storage:
+    size: 5Gi
+    storageClass: ""         # Để trống = dùng default StorageClass của cluster
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+
+# ============================================================
+# Nginx (Reverse Proxy)
+# ============================================================
+nginx:
+  image:
+    repository: nginx
+    tag: stable-alpine
+    pullPolicy: IfNotPresent
+  replicas: 1
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30080     # Truy cập qua: http://<NodeIP>:30080
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"

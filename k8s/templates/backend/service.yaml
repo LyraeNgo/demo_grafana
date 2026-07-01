@@ -1,0 +1,19 @@
+# Service nội bộ cho Backend
+# ClusterIP: chỉ nginx (trong cùng cluster) mới gọi được backend
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "chaters.labels" . | nindent 4 }}
+    {{- include "chaters.backend.selectorLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.backend.port }}
+      targetPort: {{ .Values.backend.port }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "chaters.backend.selectorLabels" . | nindent 4 }}
