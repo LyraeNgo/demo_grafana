@@ -19,25 +19,18 @@ spec:
   # Source: Git repo chứa Helm chart
   # -------------------------------------------------------
   source:
-    # TODO: Thay bằng URL Git repo thực của bạn
     repoURL: https://github.com/LyraeNgo/demo_grafana.git
-    # Branch/tag ArgoCD sẽ watch. Dùng 'main' hoặc 'HEAD'
     targetRevision: HEAD
-    # Đường dẫn đến Helm chart trong repo
     path: k8s
 
     helm:
-      # Override values - các giá trị ở đây ghi đè values.yaml
-      # Hữu ích để set image tag khác nhau cho dev/prod
       values: |
         backend:
           image:
-            # TODO: Thay YOUR_DOCKERHUB_USERNAME bằng username thực
             repository: minhtam2611/chaters-backend
             tag: latest
         mongodb:
           credentials:
-            # TODO: Đổi password trong production!
             rootPassword: admin123
         nginx:
           service:
