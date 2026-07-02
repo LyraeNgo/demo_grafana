@@ -1,0 +1,76 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chaters-ingress
+  namespace: chaters
+  annotations:
+    kubernetes.io/ingress.class: traefik
+spec:
+  tls:
+    - hosts:
+        - chaters.shop
+        - www.chaters.shop
+      secretName: chaters-shop-tls
+
+    # - hosts:
+    #     - grafana.chaters.shop
+    #   secretName: grafana-tls
+
+    # - hosts:
+    #     - fe.chaters.shop
+    #   secretName: frontend-tls
+
+  rules:
+
+    ##################################################
+    # Backend
+    ##################################################
+    - host: chaters.shop
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 4000
+
+    - host: www.chaters.shop
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 4000
+
+    # ##################################################
+    # # Grafana
+    # ##################################################
+    # - host: grafana.chaters.shop
+    #   http:
+    #     paths:
+    #       - path: /
+    #         pathType: Prefix
+    #         backend:
+    #           service:
+    #             name: grafana
+    #             port:
+    #               number: 3000
+
+    # ##################################################
+    # # Frontend
+    # ##################################################
+    # - host: fe.chaters.shop
+    #   http:
+    #     paths:
+    #       - path: /
+    #         pathType: Prefix
+    #         backend:
+    #           service:
+    #             name: frontend
+    #             port:
+    #               number: 80
